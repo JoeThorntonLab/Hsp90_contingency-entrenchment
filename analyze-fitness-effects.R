@@ -8,6 +8,7 @@ library(mixtools)
 library(seqinr)
 library(ggplot2)
 library(Biostrings)
+library(vioplot)
 
 ################################################################################
 #collating data for Sc-reversions experiment
@@ -180,7 +181,6 @@ for(mut in Sc.data[is.na(Sc.data$mean.s),"shorthand"]){
 }
 
 ################################################################################################################################
-
 #collating data for ancAmo-fwds experiment
 #read in bulk growth data for individual fwd sub mutations to ancAmo: gives log(freq(mut)/freq(wt)) versus time in #-generations, where wt is ancAmo+L378i
 ancAmo.rep1 <- read.csv(file="data_in/ancAmo-fwd-subs_rep1.csv",header=T, stringsAsFactors=F)
@@ -274,7 +274,7 @@ rm(ancAmo.i378.w1);rm(ancAmo.i378.w2)
 Sc.mean.w <- mean(c(ancAmo.rep1[3,"rel.fitness"],ancAmo.rep2[3,"rel.fitness"]))
 Sc.se.w <- sd(c(ancAmo.rep1[3,"rel.fitness"],ancAmo.rep2[3,"rel.fitness"]))/sqrt(2)
 
-#reformat s values into data table with other stats on each individual ancestral reversion; calculate mean.s's per replicate and across all 2 or 4 observations (for ancAmo, all 2, once per rep)
+#reformat s values into data table with other stats on each individual ancestral reversion; calculate mean.s's per replicate across 2 observations (1 per replicate)
 ancAmo.data <- read.csv(file="./data_in/ancAmo-fwd-subs_summary.csv",header=T, stringsAsFactors=F)
 for(i in 1:nrow(ancAmo.data)){
   subset.r1 <- ancAmo.rep1[ancAmo.rep1$position==ancAmo.data[i,"Sc.position"] & ancAmo.rep1$aa==as.character(ancAmo.data[i,"der.AA"]),]
@@ -393,7 +393,102 @@ sGR_gpd <- y_exp_gpd - y_gpd #what the relative growth rate difference would be 
 s_gpd <- sGR_gpd/log(2) #what the per-generation selection coefficient would be versus GPD-level expressing wildtype strain, given the observed functional defect of reversions
 
 ################################################################################################################################
-#calculate the fraction of reversions, forward mutations that are deleterious via comparison to the wt sampling distribution
+#calculate the fraction of reversions, forward mutations that are deleterious 
+#first, nonparameterized approach: count number of mutations with s_obs < 0 versus s_obs > 0; this depends on the assumption that errors are unbiased w.r.t. to measured s
+#this is are most "generous" method (likely to give highest proportion deleteirous)
+#two ways to confirm assumption:
+#1) check that wildtype are truly symmetrical (qqnorm)
+qqnorm(Sc.WT$s,pch=19);qqline(Sc.WT$s,lty=2);shapiro.test(Sc.WT$s)
+qqnorm(ancAmo.WT$s,pch=19);qqline(ancAmo.WT$s,lty=2);shapiro.test(ancAmo.WT$s)
+
+#2) for measured selection coefficients, illustrate that difference in s_rep1 and s_rep2 is unbiased w.r.t. mean.s
+plot(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"mean.s"],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep2.mean.s"],pch=19,xlab="mean s",ylab="s_rep1 - s_rep2")
+summary(lm(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep2.mean.s"] ~ Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"mean.s"]));abline(lm(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep2.mean.s"] ~ Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"mean.s"]),lty=2,col="red")
+plot(ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"mean.s"],ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep1.s"]-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep2.s"],pch=19,xlab="mean s",ylab="s_rep1 - s_rep2")
+summary(lm(ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep1.s"]-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep2.s"] ~ ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"mean.s"]));abline(lm(ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep1.s"]-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep2.s"] ~ ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"mean.s"]),lty=2,col="red")
+
+plot(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"mean.s"],abs(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep2.mean.s"]),pch=19,xlab="mean s",ylab="abs(s_rep1 - s_rep2)")
+summary(lm(abs(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep2.mean.s"]) ~ Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"mean.s"]));abline(lm(abs(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"rep2.mean.s"]) ~ Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1,"mean.s"]),lty=2,col="red")
+plot(ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"mean.s"],abs(ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep1.s"]-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep2.s"]),pch=19,xlab="mean s",ylab="abs(s_rep1 - s_rep2)")
+summary(lm(abs(ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep1.s"]-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep2.s"]) ~ ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"mean.s"]));abline(lm(abs(ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep1.s"]-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"rep2.s"]) ~ ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > -0.1,"mean.s"]),lty=2,col="red")
+
+#errors seem unbiased w.r.t. mean.s, so a reaonsable estimate of the fraction of mutations in the dataset that are beneficial is simply the number with mean.s < 0
+nrow(Sc.data[Sc.data$mean.s < 0 & Sc.data$bulk==T,])/nrow(Sc.data[Sc.data$bulk==T,]) #0.9484536 (remaining ben)
+nrow(ancAmo.data[ancAmo.data$mean.s < 0 & ancAmo.data$bulk==T,])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #0.6551724 (remaining ben)
+
+################################################################################################################################
+#alternative approach: test for significance for each variant individually via 95% confidence intervals
+#this is likely our most "conservative" approach (likely to give the smallest proportion), since it relies on individually identifying each mutation as neutral or non-neutral, not assigning a continuous probability
+#Sc
+sd.alt.Sc <- sd(c(Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"],Sc.data[Sc.data$mean.s > -0.1,"rep2.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"]),na.rm=T)
+sd.WT.Sc <- sd(Sc.WT$s)
+#sqrt(sum(c(Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"],Sc.data[Sc.data$mean.s > -0.1,"rep2.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"])^2,na.rm=T)/(sum(!is.na(c(Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"],Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"])))-1))
+#test if CI given mean.s and SE derived from average error overlaps zero
+for(i in 1:nrow(Sc.data)){
+  if(Sc.data$bulk[i]==FALSE){
+    Sc.data$CI.low[i] <- NA
+    Sc.data$CI.high[i] <- NA
+  }else{
+    Sc.data$CI.low[i] <- Sc.data$mean.s[i] - 1.96*sd.alt.Sc
+    Sc.data$CI.high[i] <- Sc.data$mean.s[i] + 1.96*sd.alt.Sc
+  }
+}
+nrow(Sc.data[!is.na(Sc.data$bulk) & Sc.data$CI.high < 0,])/nrow(Sc.data[Sc.data$bulk==T,]) #0.5360825
+nrow(Sc.data[!is.na(Sc.data$bulk) & Sc.data$CI.low > 0,])/nrow(Sc.data[Sc.data$bulk==T,]) #0.01030928
+
+#ancAmo
+sd.amo.alt <- sd(c(ancAmo.data[ancAmo.data$mean.s > -0.1  & ancAmo.data$bulk==T,"rep1.s"]-ancAmo.data[ancAmo.data$mean.s > -0.1 & ancAmo.data$bulk==T,"mean.s"],ancAmo.data[ancAmo.data$mean.s > -0.1 & ancAmo.data$bulk==T,"rep2.s"]-ancAmo.data[ancAmo.data$mean.s > -0.1 & ancAmo.data$bulk==T,"mean.s"]),na.rm=T)
+sd.amo.WT <- sd(ancAmo.WT$s)
+#test if CI given mean.s and SE derived from ancAmo.WT overlaps zero
+for(i in 1:nrow(ancAmo.data)){
+  if(ancAmo.data$bulk[i]==FALSE){
+    ancAmo.data$CI.low[i] <- NA
+    ancAmo.data$CI.high[i] <- NA
+  }else{
+    ancAmo.data$CI.low[i] <- ancAmo.data$mean.s[i] - 1.96*sd.amo.alt
+    ancAmo.data$CI.high[i] <- ancAmo.data$mean.s[i] + 1.96*sd.amo.alt
+  }
+}
+nrow(ancAmo.data[!is.na(ancAmo.data$bulk) & ancAmo.data$CI.high < 0,])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #0.4827586
+nrow(ancAmo.data[!is.na(ancAmo.data$bulk) & ancAmo.data$CI.low > 0,])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #0.2643678
+
+################################################################################################################################
+#empirical bayes approach: evaluate the probability density of the wt sampling distribution versus an alternative sampling distrubtion centered at s_obs for each s_obs
+#get the sd of the alternative distribution as the sd of all observed replicate measurements
+#this makes the assumption that noise is unbiased, all variants observed with the same noise
+#Sc
+for(i in 1:nrow(Sc.data)){
+  if(Sc.data$bulk[i]==FALSE){
+    Sc.data$p.neut[i] <- NA
+  }else{
+    s <- Sc.data$mean.s[i]
+    d.wt <- dnorm(s, 0, sd.WT.Sc)
+    d.alt <- dnorm(s, s, sd.alt.Sc)
+    Sc.data$p.neut[i] <- d.wt/(d.wt+d.alt)
+  }
+}
+sum(Sc.data[Sc.data$bulk==T, "p.neut"])/nrow(Sc.data[Sc.data$bulk==T,]) #proportion neutral = 0.184
+sum(1-Sc.data[Sc.data$bulk==T & Sc.data$mean.s < 0, "p.neut"])/nrow(Sc.data[Sc.data$bulk==T,]) #proportion deleterious 0.783
+sum(1-Sc.data[Sc.data$bulk==T & Sc.data$mean.s > 0, "p.neut"])/nrow(Sc.data[Sc.data$bulk==T,]) #proportion beneficial 0.033
+
+
+#ancAmo
+for(i in 1:nrow(ancAmo.data)){
+  if(ancAmo.data$bulk[i]==FALSE){
+    ancAmo.data$p.neut[i] <- NA
+  }else{
+    s <- ancAmo.data$mean.s[i]
+    d.wt <- dnorm(s, 0, sd.amo.WT)
+    d.alt <- dnorm(s, s, sd.amo.alt)
+    ancAmo.data$p.neut[i] <- d.wt/(d.wt+d.alt)
+  }
+}
+sum(ancAmo.data[ancAmo.data$bulk==T, "p.neut"])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #proportion neutral = 0.194
+sum(1-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s < 0, "p.neut"])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #proportion deleterious 0.541
+sum(1-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > 0, "p.neut"])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #proportion beneficial 0.264
+
+################################################################################################################################
+#mixture model approach
 #Sc data
 vals <- Sc.data$mean.s[Sc.data$bulk==TRUE & Sc.data$mean.s > -0.04] #mixtools has troubles with outliers -- infer mixture from the bulk part of the distribution, any below 0.04 are unambiguously deleterious anyway
 hist(vals,breaks=20,col="gray50",xlab="Selection coefficient (relative to ScHsp90)",main="",freq=T,xlim=c(-0.03, 0.01));abline(v=0,lty=2)
@@ -409,10 +504,10 @@ n <- 2; mix2 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(Sc.WT$s),-0
 n <- 3; mix3 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(Sc.WT$s),-0.01,-0.005), sigma=rep(sd(Sc.WT$s),n), mean.constr=c(mean(Sc.WT$s), rep(NA,n-1)), sd.constr=c(sd(Sc.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
 n <- 4; mix4 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(Sc.WT$s),-0.01,-0.005,0.005), sigma=rep(sd(Sc.WT$s),n), mean.constr=c(mean(Sc.WT$s), rep(NA,n-1)), sd.constr=c(sd(Sc.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
 n <- 5; mix5 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(Sc.WT$s),-0.01,-0.005,-0.003,0.005), sigma=rep(sd(Sc.WT$s),n), mean.constr=c(mean(Sc.WT$s), rep(NA,n-1)), sd.constr=c(sd(Sc.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
-summary.mixEM(mix2) #loglik 334.3584, k = 3, AIC = -662.7168
-summary.mixEM(mix3) #loglik 340.9462, k = 6, AIC = -669.8924
-summary.mixEM(mix4) #loglik 341.8108, k = 9, AIC = -665.6216
-summary.mixEM(mix5) #loglik 343.1684, k = 12, AIC = -662.3368
+summary.mixEM(mix2) #loglik 334.3584, k = 3, AIC = -662.7168, sum(lambda.del) = 1.0, sum(lambda.ben) = 0
+summary.mixEM(mix3) #loglik 340.9462, k = 6, AIC = -669.8924, sum(lambda.del) = 0.929, sum(lambda.ben) = 0
+summary.mixEM(mix4) #loglik 341.8108, k = 9, AIC = -665.6216, sum(lambda.del) = 0.932, sum(lambda.ben) = 0
+summary.mixEM(mix5) #loglik 343.1684, k = 12, AIC = -662.3368, sum(lambda.del) = 0.957, sum(lambda.ben) = 0.043
 
 #3-component mixture favored by AIC
 #define a density function for this 3-component mixture model
@@ -506,11 +601,11 @@ n <- 4; mix4 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(ancAmo.WT$s
 n <- 5; mix5 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), maxit=2000, mu=c(mean(ancAmo.WT$s),-0.02,-0.001,0.001,0.02), sigma=rep(sd(ancAmo.WT$s),n), mean.constr=c(mean(ancAmo.WT$s), rep(NA,n-1)), sd.constr=c(sd(ancAmo.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
 n <- 6; mix6 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), maxit=2000, mu=c(mean(ancAmo.WT$s),-0.02,-0.001,-0.001,0.001,0.02), sigma=rep(sd(ancAmo.WT$s),n), mean.constr=c(mean(ancAmo.WT$s), rep(NA,n-1)), sd.constr=c(sd(ancAmo.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
 
-summary.mixEM(mix2) #loglik 243.8518 , k = 3, AIC = -481.7036
-summary.mixEM(mix3) #loglik 245.4855 , k = 6, AIC = -478.971
-summary.mixEM(mix4) #loglik 246.215, k = 9, AIC = -474.43
-summary.mixEM(mix5) #loglik 252.74, k = 12, AIC = -481.48
-summary.mixEM(mix6) #loglik 252.74 , k = 15, AIC = -475.48
+summary.mixEM(mix2) #loglik 243.8518 , k = 3, AIC = -481.7036, sum(lambda.del) = 0.766, sum(lambda.ben) = 0.000
+summary.mixEM(mix3) #loglik 245.4855 , k = 6, AIC = -478.971, sum(lambda.del) = 0.910, sum(lambda.ben) = 0.000
+summary.mixEM(mix4) #loglik 246.215, k = 9, AIC = -474.43, sum(lambda.del) = 0.376, sum(lambda.ben) = 0.133
+summary.mixEM(mix5) #loglik 252.74, k = 12, AIC = -481.48, sum(lambda.del) = 0.493, sum(lambda.ben) = 0.162
+summary.mixEM(mix6) #loglik 252.74 , k = 15, AIC = -475.48, sum(lambda.del) = 0.493, sum(lambda.ben) = 0.162
 
 #2-component and 5-component similarly favored by AIC -- tentatively would favor 5-component, it's more conservative (for # deleterious) and just "looks" like a better fit...
 #define density functions for these 2- and 5-component mixture model
@@ -701,6 +796,8 @@ arrows(ancestors$distance.from.hsp82,ancestors$s.predicted.from.Sc - 1.96*ancest
 points(ancestors$distance.from.hsp82,ancestors$s.predicted.from.Sc,pch=20)
 arrows(ancestors$distance.from.hsp82[36],log(ancAmo.i378.mean.w-1.96*ancAmo.i378.se.w),ancestors$distance.from.hsp82[36],log(ancAmo.i378.mean.w+1.96*ancAmo.i378.se.w),length=0.025,angle=90,code=3,col="blue")
 points(ancestors$distance.from.hsp82[36],log(ancAmo.i378.mean.w),pch=20,col="blue",cex=1.4)
+arrows(ancestors$distance.from.hsp82[36],log(ancAmo.mean.w-1.96*ancAmo.se.w),ancestors$distance.from.hsp82[36],log(ancAmo.mean.w+1.96*ancAmo.se.w),length=0.025,angle=90,code=3,col="blue")
+points(ancestors$distance.from.hsp82[36],log(ancAmo.mean.w),pch=20,col="blue",cex=1.4)
 points(ancestors$distance.from.hsp82[25],log(0.9905),pch=20,col="green",cex=1.4) #fitness of ancAsco measured in isogenic growth relative to Sc
 dev.off()
 
@@ -736,7 +833,7 @@ arrows(ancestors$distance.from.ancAmo,ancestors$s.predicted.from.ancAmo - 1.96*a
 points(ancestors$distance.from.ancAmo,ancestors$s.predicted.from.ancAmo,pch=20)
 arrows(ancestors$distance.from.ancAmo[1],log(Sc.mean.w-1.96*Sc.se.w),ancestors$distance.from.ancAmo[1],log(Sc.mean.w+1.96*Sc.se.w),length=0.025,angle=90,code=3,col="red")
 points(ancestors$distance.from.ancAmo[1],log(Sc.mean.w),pch=20,col="red",cex=1.4)
-points(ancestors$distance.from.ancAmo[25],log(1.0269),pch=20,col="green",cex=1.4) #fitness of ancAsco measured in isogenic growth relative to Sc=1.036698
+points(ancestors$distance.from.ancAmo[25],log(1.0269),pch=20,col="green",cex=1.4) #fitness of ancAsco measured in isogenic growth relative to Sc=1.0269
 dev.off()
 
 ################################################################################################################################
@@ -795,7 +892,7 @@ ancAmo.data.bulk <- ancAmo.data[ancAmo.data$bulk==TRUE,]
 x <- sum(ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"PP.ben"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"Sc.PP.ben"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"Sc.PP.ben"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"PP.ben"],na.rm=T)
 #next, class 1 (i->j); PP.del is prob contingent, Sc.PP.ben is prob entrenched
 x <- x + sum(ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"PP.ben"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"Sc.PP.del"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"Sc.PP.del"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"PP.ben"],na.rm=T)
-#*** finally, class 2 (i->j->k); PP.del is prob that k is contingent, Sc.PP.del is prob k is irreversible (remember this Sc.PP.del is not for the substituion in that row, but rather for that intermediate state j, coming from different starting points in ancAmo versus Sc)
+#finally, class 2 (i->j->k); PP.del is prob that k is contingent, Sc.PP.del is prob k is irreversible (remember this Sc.PP.del is not for the substituion in that row, but rather for that intermediate state j, coming from different starting points in ancAmo versus Sc)
 x <- x + sum(ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"PP.ben"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"Sc.PP.ben"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"Sc.PP.ben"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"PP.ben"],na.rm=T)
 x/(nrow(ancAmo.data.bulk)-1) #5.01%
 
@@ -874,6 +971,19 @@ p3+geom_errorbar(aes(x=ancAmo.data.bulk[ancAmo.data.bulk$mean.s > -0.1 & ancAmo.
   theme(text=element_text(size=16))+
   xlab(expression(italic(s)[ij]~","~AncAmoHsp90))+ylab(expression(italic(s)[ij]~","~ScHsp90))
 dev.off()
+
+#with outliers
+pdf(file="plots/Sc-s_vs_AncAmo-s_only-i-j-points_with-outliers.pdf",width=5.5,height=5,useDingbats=F)
+p4 <- ggplot(data=ancAmo.data.bulk[ancAmo.data.bulk$direction==1,],aes(x=mean.s,y=mean.s.rev))
+p4+geom_errorbar(aes(x=ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"mean.s"],ymin=ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"mean.s.rev"]-ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"SE.mean.s.rev"],ymax=ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"mean.s.rev"]+ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"SE.mean.s.rev"]),width=0.0005,colour="gray70")+
+  geom_errorbarh(aes(y=ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"mean.s.rev"],xmin=ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"mean.s"]-ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"SE.mean.s"],xmax=ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"mean.s"]+ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"SE.mean.s"]),height=0.0005,colour="gray70")+
+  geom_point(size=3.5)+
+  scale_colour_manual(values="black")+
+  theme_classic()+
+  theme(text=element_text(size=16))+
+  xlab(expression(italic(s)[ij]~","~AncAmoHsp90))+ylab(expression(italic(s)[ij]~","~ScHsp90))
+dev.off()
+
 
 ########################################################################################################################
 #want to look for features that might be associated with the degree to which a mutation is deleterious in each of the datasets
@@ -972,6 +1082,7 @@ var <- "diff.hydrophobicity"; cor.test(Sc.data[Sc.data$bulk==T, var],Sc.data[Sc.
 var <- "abs.diff.hydrophobicity"; cor.test(Sc.data[Sc.data$bulk==T, var],Sc.data[Sc.data$bulk==T, "mean.s"], method="spearman");plot(Sc.data[Sc.data$bulk==T, var],Sc.data[Sc.data$bulk==T, "mean.s"])
 var <- "diff.volume"; cor.test(Sc.data[Sc.data$bulk==T, var],Sc.data[Sc.data$bulk==T, "mean.s"], method="spearman");plot(Sc.data[Sc.data$bulk==T, var],Sc.data[Sc.data$bulk==T, "mean.s"])
 var <- "abs.diff.volume"; cor.test(Sc.data[Sc.data$bulk==T, var],Sc.data[Sc.data$bulk==T, "mean.s"], method="spearman");plot(Sc.data[Sc.data$bulk==T, var],Sc.data[Sc.data$bulk==T, "mean.s"])
+var <- "dist.to.sub"; cor.test(Sc.data[Sc.data$bulk==T, var],Sc.data[Sc.data$bulk==T, "mean.s"], method="spearman");plot(Sc.data[Sc.data$bulk==T, var],Sc.data[Sc.data$bulk==T, "mean.s"])
 
 #Sc, exclude strongly deleterious outliers
 var <- "avg.mut.effect"; cor.test(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"], method="spearman");plot(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"])
@@ -983,6 +1094,7 @@ var <- "diff.hydrophobicity"; cor.test(Sc.data[Sc.data$bulk==T & Sc.data$mean.s 
 var <- "abs.diff.hydrophobicity"; cor.test(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"], method="spearman");plot(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"])
 var <- "diff.volume"; cor.test(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"], method="spearman");plot(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"])
 var <- "abs.diff.volume"; cor.test(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"], method="spearman");plot(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"])
+var <- "dist.to.sub"; cor.test(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"], method="spearman");plot(Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, var],Sc.data[Sc.data$bulk==T & Sc.data$mean.s > -0.1, "mean.s"])
 
 #ancAmo, all muts
 var <- "avg.mut.effect"; cor.test(ancAmo.data[ancAmo.data$bulk==T, var],ancAmo.data[ancAmo.data$bulk==T, "mean.s"], method="spearman");plot(ancAmo.data[ancAmo.data$bulk==T, var],ancAmo.data[ancAmo.data$bulk==T, "mean.s"])
@@ -1013,6 +1125,20 @@ hist(EMPIRIC[EMPIRIC$shorthand %in% Sc.data$shorthand,"s"],col="gray70",main="",
 median(EMPIRIC[EMPIRIC$shorthand %in% Sc.data$shorthand,"s"])
 wilcox.test(EMPIRIC[EMPIRIC$shorthand %in% Sc.data$shorthand,"s"],conf.int=T,paired=F)
 #same average 1% fitness defect, but not a significant difference (exptl noise)
+
+#look at distributions of mutant effects from full EMPIRIC data
+y1 <- EMPIRIC[EMPIRIC$mut.AA != "*" & EMPIRIC$Sc.AA != EMPIRIC$mut.AA,"s"][!is.na(EMPIRIC[EMPIRIC$mut.AA != "*" & EMPIRIC$Sc.AA != EMPIRIC$mut.AA,"s"])]
+y2 <- EMPIRIC[EMPIRIC$mut.AA == "*","s"][!is.na(EMPIRIC[EMPIRIC$mut.AA == "*","s"])]
+y3 <- EMPIRIC[EMPIRIC$Sc.AA == EMPIRIC$mut.AA,"s"][!is.na(EMPIRIC[EMPIRIC$Sc.AA == EMPIRIC$mut.AA,"s"])]
+y4 <- EMPIRIC[EMPIRIC$shorthand %in% Sc.data$shorthand,"s"][!is.na(EMPIRIC[EMPIRIC$shorthand %in% Sc.data$shorthand,"s"])]
+plot(NA,NA,xlim=c(0,5),ylim=c(-1.65,0.6),xaxt="n",ylab="s",xlab="")
+vioplot(y1,at=1,add=T,col="gray50")
+vioplot(y2,at=2,add=T,col="orange")
+vioplot(y3,at=3,add=T,col="cyan")
+vioplot(y4,at=4,add=T,col="purple")
+axis(side=1,at=c(1,2,3,4),labels=c("DFE","STOP","WT","all reversons"),las=2)
+
+wilcox.test(y1,y4)
 
 ########################################################################################################################
 #analyze epistatic compensations from isogenic growths
@@ -1154,7 +1280,13 @@ dev.off()
 #correlation in fitness as determined in monoculture growths or bulk competitions for the six genotypes where we have measurements both ways
 iso <- c(log(mean(E7A)),log(mean(L378I)),log(mean(N151A)),log(mean(T13N)),log(mean(V23F)),ancAsco.iso[4,"s"],ancAsco.iso[5,"s"])
 bulk <- c(Sc.data[Sc.data$shorthand=="E7A","mean.s"],NA,Sc.data[Sc.data$shorthand=="N151A","mean.s"],Sc.data[Sc.data$shorthand=="T13N","mean.s"],Sc.data[Sc.data$shorthand=="V23F","mean.s"],log(ancAmo.mean.w),log(ancAmo.i378.mean.w))
-
 plot(bulk,iso,pch=19,xlim=c(-1,0.05),ylim=c(-1,0.05),xlab="Selection coefficient, bulk competition", ylab="Selection coefficient, monoculture growth");abline(lm(iso~bulk),lty=2);summary(lm(iso~bulk))
+#if constrain to pass through (0,0)
+plot(bulk,iso,pch=19,xlim=c(-1,0.05),ylim=c(-1,0.05),xlab="Selection coefficient, bulk competition", ylab="Selection coefficient, monoculture growth");abline(lm(iso~bulk+0),lty=2);summary(lm(iso~bulk+0))
+#passing through zero, zero, line becomes s.mono = 0.6641*s.bulk --> s.bulk = s.mono/0.6641
+exp(log(0.9905)/0.6641) #0.9857
+#what would the relative fitness of ancAsco (as measured in monoculture) be relative to Sc and ancAmo, if transformed by this relationship?
+#relationship: s.iso = 0.58444*s.bulk -0.05052 --> s.bulk = (s.iso+0.05052)/0.584
+exp((log(.9905)+0.05052)/0.584) #1.0727
 
 #FIN
