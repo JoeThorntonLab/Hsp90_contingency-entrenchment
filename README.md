@@ -1,1 +1,1 @@
-Input data and script to reproduce all analyses for Starr, Flynn, Mishra, Bolon and Thornton "Widespread contingency and entrenchment in the long-term evolution of Hsp90", bioRxiv 2017
+Input data and script to reproduce all analyses for Starr, Flynn, Mishra, Bolon and Thornton "Pervasive contingency and entrenchment in a billion years of Hsp90 evolution", bioRxiv 2017
