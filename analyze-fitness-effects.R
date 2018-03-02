@@ -1,6 +1,6 @@
 #24 August 2017
 #TNS - tyler.n.starr@gmail.com
-#script to read in data from bulk growth assays and isogenic growths to derive and analyze selection coefficients of mutations between historical states in Hsp90
+#script to read in data from bulk growth assays and isogenic growths to calculate and analyze selection coefficients of mutations between historical states in Hsp90
 
 setwd("/path/to/source/file/directory") #also, make an empty folder in this location called "plots" to deposit all figures
 
@@ -20,8 +20,7 @@ Sc.rep2 <- read.csv(file="data_in/Sc-reversions_rep2.csv",header=T, stringsAsFac
 Sc.WT.rep1 <- read.csv(file="data_in/Sc-reversions_WT_rep1.csv",header=F,stringsAsFactors=F)
 Sc.WT.rep2 <- read.csv(file="data_in/Sc-reversions_WT_rep2.csv",header=F,stringsAsFactors=F)
 #reversion mutants were represented by a median of 763 reads in the first timepoint, 75% represented by >572 reads --> 
-# #find pooled groups of wt barcodes to create independent samples that each start with ~500 reads; this will give a conservative SEM for wildtype, as most variants have higher sequencing depth than this
-
+#find pooled groups of wt barcodes to create independent samples that each start with ~500 reads
 #rep1 groups: [1:26],[27:55],[56:87],[88:112]
 Sc.WT.rep1.pooled <- data.frame(position=c("WT1","WT2","WT3","WT4"),codon=c("WT1","WT2","WT3","WT4"),aa=c("WT1","WT2","WT3","WT4"),gen0=rep(NA,4),gen2.8=rep(NA,4),gen4.2=rep(NA,4),gen6=rep(NA,4),gen9.3=rep(NA,4),gen13.6=rep(NA,4),gen15.7=rep(NA,4),gen19.3=rep(NA,4))
 Sc.WT.rep1.pooled[1,4:11] <- colSums(Sc.WT.rep1[1:26,2:9])
@@ -146,34 +145,26 @@ Sc.iso.rep1$rel.fitness <- (Sc.iso.rep1$raw.fitness - Sc.iso.rep1$raw.fitness[2]
 #convert back to selection coefficient s=ln(w)
 Sc.iso.rep1$s <- log(Sc.iso.rep1$rel.fitness)
 
+#rep2
 for(i in 1:nrow(Sc.iso.rep2)){
   fit <- lm(as.numeric(Sc.iso.rep2[i,2:6]) ~ timepoints2)
-  Sc.iso.rep2$slope[i] <- summary(fit)$coefficients[2,1] #slope of ln(OD) versus time is malthusian parameter
+  Sc.iso.rep2$slope[i] <- summary(fit)$coefficients[2,1]
   Sc.iso.rep2$slope.se[i] <- summary(fit)$coefficients[2,2]
 }
-#calculate dimensionless per-generation selection coefficient, assuming that seleciton is density-independent, as (slope_x - slope_wt)/slope_wt*ln2 (last part equivalent to multiplying by generation time of WT)
 Sc.iso.rep2$s <- (Sc.iso.rep2$slope-Sc.iso.rep2$slope[1])/(Sc.iso.rep2$slope[1])*log(2)
-#linear transform values such that relative fitness of null allele is 0
-#convert raw s to fitness given w=e^s
 Sc.iso.rep2$raw.fitness <- exp(Sc.iso.rep2$s)
-#stretch relative fitness space to be from 0 (null) to 1 (wt)
 Sc.iso.rep2$rel.fitness <- (Sc.iso.rep2$raw.fitness - Sc.iso.rep2$raw.fitness[2])/(Sc.iso.rep2$raw.fitness[1] - Sc.iso.rep2$raw.fitness[2])
-#convert back to selection coefficient s=ln(w)
 Sc.iso.rep2$s <- log(Sc.iso.rep2$rel.fitness)
 
+#rep3
 for(i in 1:nrow(Sc.iso.rep3)){
   fit <- lm(as.numeric(Sc.iso.rep3[i,2:6]) ~ timepoints3)
-  Sc.iso.rep3$slope[i] <- summary(fit)$coefficients[2,1] #slope of ln(OD) versus time is malthusian parameter
+  Sc.iso.rep3$slope[i] <- summary(fit)$coefficients[2,1]
   Sc.iso.rep3$slope.se[i] <- summary(fit)$coefficients[2,2]
 }
-#calculate dimensionless per-generation selection coefficient, assuming that seleciton is density-independent, as (slope_x - slope_wt)/slope_wt*ln2 (last part equivalent to multiplying by generation time of WT)
 Sc.iso.rep3$s <- (Sc.iso.rep3$slope-Sc.iso.rep3$slope[1])/(Sc.iso.rep3$slope[1])*log(2)
-#linear transform values such taht relative fitness of null allele is 0
-#convert raw s to fitness given w=e^s
 Sc.iso.rep3$raw.fitness <- exp(Sc.iso.rep3$s)
-#stretch relative fitness space to be from 0 (null) to 1 (wt)
 Sc.iso.rep3$rel.fitness <- (Sc.iso.rep3$raw.fitness - Sc.iso.rep3$raw.fitness[2])/(Sc.iso.rep3$raw.fitness[1] - Sc.iso.rep3$raw.fitness[2])
-#convert back to selection coefficient s=ln(w)
 Sc.iso.rep3$s <- log(Sc.iso.rep3$rel.fitness)
 
 for(mut in Sc.data[is.na(Sc.data$mean.s),"shorthand"]){
@@ -222,7 +213,6 @@ ancAmo.WT.rep2.pooled$gen6.67 <- log(ancAmo.WT.rep2.pooled$gen6.67/52136)
 ancAmo.WT.rep2.pooled$gen9.17 <- log(ancAmo.WT.rep2.pooled$gen9.17/51360)
 ancAmo.WT.rep2.pooled$gen10.83 <- log(ancAmo.WT.rep2.pooled$gen10.83/55415)
 ancAmo.WT.rep2.pooled$gen12.92 <- log(ancAmo.WT.rep2.pooled$gen12.92/52959)
-
 
 #append WT reads to ancAmo.repx data
 ancAmo.rep1 <- rbind(ancAmo.rep1,ancAmo.WT.rep1.pooled)
@@ -395,7 +385,6 @@ s_gpd <- sGR_gpd/log(2) #what the per-generation selection coefficient would be 
 ################################################################################################################################
 #calculate the fraction of reversions, forward mutations that are deleterious 
 #first, nonparameterized approach: count number of mutations with s_obs < 0 versus s_obs > 0; this depends on the assumption that errors are unbiased w.r.t. to measured s
-#this is are most "generous" method (likely to give highest proportion deleteirous)
 #two ways to confirm assumption:
 #1) check that wildtype are truly symmetrical (qqnorm)
 qqnorm(Sc.WT$s,pch=19);qqline(Sc.WT$s,lty=2);shapiro.test(Sc.WT$s)
@@ -420,40 +409,38 @@ nrow(ancAmo.data[ancAmo.data$mean.s < 0 & ancAmo.data$bulk==T,])/nrow(ancAmo.dat
 #alternative approach: test for significance for each variant individually via 95% confidence intervals
 #this is likely our most "conservative" approach (likely to give the smallest proportion), since it relies on individually identifying each mutation as neutral or non-neutral, not assigning a continuous probability
 #Sc
-sd.alt.Sc <- sd(c(Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"],Sc.data[Sc.data$mean.s > -0.1,"rep2.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"]),na.rm=T)
-sd.WT.Sc <- sd(Sc.WT$s)
-#sqrt(sum(c(Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"],Sc.data[Sc.data$mean.s > -0.1,"rep2.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"])^2,na.rm=T)/(sum(!is.na(c(Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"],Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"])))-1))
+se.WT.Sc <- sd(Sc.WT$s)/sqrt(2)
+se.alt.Sc <- sqrt(sum(c(Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"],Sc.data[Sc.data$mean.s > -0.1,"rep2.mean.s"]-Sc.data[Sc.data$mean.s > -0.1,"mean.s"])^2,na.rm=T)/(sum(!is.na(c(Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"],Sc.data[Sc.data$mean.s > -0.1,"rep1.mean.s"])))))
 #test if CI given mean.s and SE derived from average error overlaps zero
 for(i in 1:nrow(Sc.data)){
   if(Sc.data$bulk[i]==FALSE){
     Sc.data$CI.low[i] <- NA
     Sc.data$CI.high[i] <- NA
   }else{
-    Sc.data$CI.low[i] <- Sc.data$mean.s[i] - 1.96*sd.alt.Sc
-    Sc.data$CI.high[i] <- Sc.data$mean.s[i] + 1.96*sd.alt.Sc
+    Sc.data$CI.low[i] <- Sc.data$mean.s[i] - 1.96*se.alt.Sc
+    Sc.data$CI.high[i] <- Sc.data$mean.s[i] + 1.96*se.alt.Sc
   }
 }
-nrow(Sc.data[!is.na(Sc.data$bulk) & Sc.data$CI.high < 0,])/nrow(Sc.data[Sc.data$bulk==T,]) #0.5360825
-nrow(Sc.data[!is.na(Sc.data$bulk) & Sc.data$CI.low > 0,])/nrow(Sc.data[Sc.data$bulk==T,]) #0.01030928
+nrow(Sc.data[!is.na(Sc.data$bulk) & Sc.data$CI.high < 0,])/nrow(Sc.data[Sc.data$bulk==T,]) #0.5360825 del
+nrow(Sc.data[!is.na(Sc.data$bulk) & Sc.data$CI.low > 0,])/nrow(Sc.data[Sc.data$bulk==T,]) #0.01030928 ben
 
 #ancAmo
-sd.amo.alt <- sd(c(ancAmo.data[ancAmo.data$mean.s > -0.1  & ancAmo.data$bulk==T,"rep1.s"]-ancAmo.data[ancAmo.data$mean.s > -0.1 & ancAmo.data$bulk==T,"mean.s"],ancAmo.data[ancAmo.data$mean.s > -0.1 & ancAmo.data$bulk==T,"rep2.s"]-ancAmo.data[ancAmo.data$mean.s > -0.1 & ancAmo.data$bulk==T,"mean.s"]),na.rm=T)
-sd.amo.WT <- sd(ancAmo.WT$s)
+se.amo.WT <- sd(ancAmo.WT$s)/sqrt(2)
+se.amo.alt <- sqrt(sum(c(ancAmo.data[ancAmo.data$mean.s > -0.1,"rep1.s"]-ancAmo.data[ancAmo.data$mean.s > -0.1,"mean.s"],ancAmo.data[ancAmo.data$mean.s > -0.1,"rep2.s"]-ancAmo.data[ancAmo.data$mean.s > -0.1,"mean.s"])^2,na.rm=T)/(sum(!is.na(c(ancAmo.data[ancAmo.data$mean.s > -0.1,"rep1.s"],ancAmo.data[ancAmo.data$mean.s > -0.1,"rep2.s"])))))
 #test if CI given mean.s and SE derived from ancAmo.WT overlaps zero
 for(i in 1:nrow(ancAmo.data)){
   if(ancAmo.data$bulk[i]==FALSE){
     ancAmo.data$CI.low[i] <- NA
     ancAmo.data$CI.high[i] <- NA
   }else{
-    ancAmo.data$CI.low[i] <- ancAmo.data$mean.s[i] - 1.96*sd.amo.alt
-    ancAmo.data$CI.high[i] <- ancAmo.data$mean.s[i] + 1.96*sd.amo.alt
+    ancAmo.data$CI.low[i] <- ancAmo.data$mean.s[i] - 1.96*se.amo.alt
+    ancAmo.data$CI.high[i] <- ancAmo.data$mean.s[i] + 1.96*se.amo.alt
   }
 }
 nrow(ancAmo.data[!is.na(ancAmo.data$bulk) & ancAmo.data$CI.high < 0,])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #0.4827586
 nrow(ancAmo.data[!is.na(ancAmo.data$bulk) & ancAmo.data$CI.low > 0,])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #0.2643678
-
 ################################################################################################################################
-#empirical bayes approach: evaluate the probability density of the wt sampling distribution versus an alternative sampling distrubtion centered at s_obs for each s_obs
+#empirical bayes like approach: evaluate the probability density of the wt sampling distribution versus an alternative sampling distrubtion centered at s_obs for each s_obs
 #get the sd of the alternative distribution as the sd of all observed replicate measurements
 #this makes the assumption that noise is unbiased, all variants observed with the same noise
 #Sc
@@ -462,14 +449,14 @@ for(i in 1:nrow(Sc.data)){
     Sc.data$p.neut[i] <- NA
   }else{
     s <- Sc.data$mean.s[i]
-    d.wt <- dnorm(s, 0, sd.WT.Sc)
-    d.alt <- dnorm(s, s, sd.alt.Sc)
+    d.wt <- dnorm(s, 0, se.WT.Sc)
+    d.alt <- dnorm(s, s, se.alt.Sc)
     Sc.data$p.neut[i] <- d.wt/(d.wt+d.alt)
   }
 }
-sum(Sc.data[Sc.data$bulk==T, "p.neut"])/nrow(Sc.data[Sc.data$bulk==T,]) #proportion neutral = 0.184
-sum(1-Sc.data[Sc.data$bulk==T & Sc.data$mean.s < 0, "p.neut"])/nrow(Sc.data[Sc.data$bulk==T,]) #proportion deleterious 0.783
-sum(1-Sc.data[Sc.data$bulk==T & Sc.data$mean.s > 0, "p.neut"])/nrow(Sc.data[Sc.data$bulk==T,]) #proportion beneficial 0.033
+sum(Sc.data[Sc.data$bulk==T, "p.neut"])/nrow(Sc.data[Sc.data$bulk==T,]) #proportion neutral = 0.159
+sum(1-Sc.data[Sc.data$bulk==T & Sc.data$mean.s < 0, "p.neut"])/nrow(Sc.data[Sc.data$bulk==T,]) #proportion deleterious 0.810
+sum(1-Sc.data[Sc.data$bulk==T & Sc.data$mean.s > 0, "p.neut"])/nrow(Sc.data[Sc.data$bulk==T,]) #proportion beneficial 0.032
 
 
 #ancAmo
@@ -478,40 +465,41 @@ for(i in 1:nrow(ancAmo.data)){
     ancAmo.data$p.neut[i] <- NA
   }else{
     s <- ancAmo.data$mean.s[i]
-    d.wt <- dnorm(s, 0, sd.amo.WT)
-    d.alt <- dnorm(s, s, sd.amo.alt)
+    d.wt <- dnorm(s, 0, se.amo.WT)
+    d.alt <- dnorm(s, s, se.amo.alt)
     ancAmo.data$p.neut[i] <- d.wt/(d.wt+d.alt)
   }
 }
-sum(ancAmo.data[ancAmo.data$bulk==T, "p.neut"])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #proportion neutral = 0.194
-sum(1-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s < 0, "p.neut"])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #proportion deleterious 0.541
-sum(1-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > 0, "p.neut"])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #proportion beneficial 0.264
+sum(ancAmo.data[ancAmo.data$bulk==T, "p.neut"])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #proportion neutral = 0.186
+sum(1-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s < 0, "p.neut"])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #proportion deleterious 0.546
+sum(1-ancAmo.data[ancAmo.data$bulk==T & ancAmo.data$mean.s > 0, "p.neut"])/nrow(ancAmo.data[ancAmo.data$bulk==T,]) #proportion beneficial 0.268
 
 ################################################################################################################################
-#mixture model approach
+#alternative approach: mixture models. Similar to counting approach, but allows us to take into account the indistinguishable-from-wildtype "neutral" fraction
 #Sc data
 vals <- Sc.data$mean.s[Sc.data$bulk==TRUE & Sc.data$mean.s > -0.04] #mixtools has troubles with outliers -- infer mixture from the bulk part of the distribution, any below 0.04 are unambiguously deleterious anyway
-hist(vals,breaks=20,col="gray50",xlab="Selection coefficient (relative to ScHsp90)",main="",freq=T,xlim=c(-0.03, 0.01));abline(v=0,lty=2)
+hist(vals,breaks=20,col="gray50",xlab="Selection coefficient (relative to ScHsp90)",ylab="Number reverse mutations",main="",freq=T,xlim=c(-0.03, 0.01));abline(v=0,lty=2)
 hist(Sc.WT$s,add=T,col="#00FFFF",freq=T,breaks=8)
-# #for summary figure, after inferring model can run following commented lines to illustrate mixture over distributions
-# curve((mix3$lambda[1]*dnorm(x,mix3$mu[1],mix3$sigma[1]))*0.25,add=T,lty=2,col="darkred",lwd=2)
-# curve((mix3$lambda[2]*dnorm(x,mix3$mu[2],mix3$sigma[2]))*0.25,add=T,lty=2,col="darkgreen",lwd=2)
-# curve((mix3$lambda[3]*dnorm(x,mix3$mu[3],mix3$sigma[3]))*0.25,add=T,lty=2,col="darkblue",lwd=2)
-# curve(dmix(x)*0.25,add=T,lwd=2)
+#for summary figure, after inferring model can run following commented lines to illustrate mixture over distributions
+# curve((mix3$lambda[1]*dnorm(x,mix3$mu[1],mix3$sigma[1]))*0.2,add=T,lty=2,col="darkblue",lwd=2)
+# curve((mix3$lambda[2]*dnorm(x,mix3$mu[2],mix3$sigma[2]))*0.2,add=T,lty=2,col="darkred",lwd=2)
+# curve((mix3$lambda[3]*dnorm(x,mix3$mu[3],mix3$sigma[3]))*0.2,add=T,lty=2,col="red",lwd=2)
+# curve(dmix3(x)*0.2,add=T,lwd=2)
 
 #use mixtools to fit gaussian mixture models, one component of which is defined by the wt sampling distributions, others vary. Figure out best number of components via AIC
 n <- 2; mix2 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(Sc.WT$s),-0.01), sigma=rep(sd(Sc.WT$s),n), mean.constr=c(mean(Sc.WT$s), rep(NA,n-1)), sd.constr=c(sd(Sc.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
 n <- 3; mix3 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(Sc.WT$s),-0.01,-0.005), sigma=rep(sd(Sc.WT$s),n), mean.constr=c(mean(Sc.WT$s), rep(NA,n-1)), sd.constr=c(sd(Sc.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
 n <- 4; mix4 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(Sc.WT$s),-0.01,-0.005,0.005), sigma=rep(sd(Sc.WT$s),n), mean.constr=c(mean(Sc.WT$s), rep(NA,n-1)), sd.constr=c(sd(Sc.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
 n <- 5; mix5 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(Sc.WT$s),-0.01,-0.005,-0.003,0.005), sigma=rep(sd(Sc.WT$s),n), mean.constr=c(mean(Sc.WT$s), rep(NA,n-1)), sd.constr=c(sd(Sc.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
-summary.mixEM(mix2) #loglik 334.3584, k = 3, AIC = -662.7168, sum(lambda.del) = 1.0, sum(lambda.ben) = 0
-summary.mixEM(mix3) #loglik 340.9462, k = 6, AIC = -669.8924, sum(lambda.del) = 0.929, sum(lambda.ben) = 0
-summary.mixEM(mix4) #loglik 341.8108, k = 9, AIC = -665.6216, sum(lambda.del) = 0.932, sum(lambda.ben) = 0
-summary.mixEM(mix5) #loglik 343.1684, k = 12, AIC = -662.3368, sum(lambda.del) = 0.957, sum(lambda.ben) = 0.043
+
+summary.mixEM(mix2) #loglik 334.3584, k = 3, AIC = -662.7168, fraction neutral: 0
+summary.mixEM(mix3) #loglik 340.9462, k = 6, AIC = -669.8924, fraction neutral: 0.0711671
+summary.mixEM(mix4) #loglik 341.8108 , k = 9, AIC = -665.6216, fraction neutral: 0.0678381
+summary.mixEM(mix5) #loglik 343.1684, k = 12, AIC = -662.3368, fraction neutral: 0
 
 #3-component mixture favored by AIC
 #define a density function for this 3-component mixture model
-dmix <- function(x){
+dmix3 <- function(x){
   return(mix3$lambda[1]*dnorm(x, mix3$mu[1], mix3$sigma[1])+mix3$lambda[2]*dnorm(x, mix3$mu[2], mix3$sigma[2])+mix3$lambda[3]*dnorm(x, mix3$mu[3], mix3$sigma[3]))
 }
 
@@ -520,30 +508,58 @@ set.seed(10101)
 qqplot(c(rnorm(round(100000*mix3$lambda[1]),mix3$mu[1],mix3$sigma[1]),rnorm(round(100000*mix3$lambda[2]),mix3$mu[2],mix3$sigma[2]),rnorm(round(100000*mix3$lambda[3]),mix3$mu[3],mix3$sigma[3])),vals,xlab="Theoretical quantiles (mixture)", ylab="Sample quantiles",xlim=c(-0.045, 0.025),ylim=c(-0.045,0.025))
 abline(a=0,b=1)
 
-#define the posterior probability of being deleterious, neutral, beneficial for each mutation -- comes from the relative pdf of deleterious versus wt (versus beneficial, though there is no beneficial component in this mixture model) at the given s for each mutation
+#estimate fraction deleterious, beneficial, neutral for each mixture model: fraction neut is neutral component mixture weight; fraction del is remaining non-neutral component density that is less than zero; fraction ben is remaining non-neutral component density that is greater than zero; reweight the fractions to include the unambiguously deleterious mutatns with s < -0.04 that were excluded from model inference (3 mutants, added on top of the 94 mutants in mixture model)
+#2-component
+((mix2$lambda[2]*pnorm(0,mix2$mu[2],mix2$sigma[2]))*94+3)/97 #pdel 0.9213648
+(mix2$lambda[1]*94)/97 #pneut 0
+1-(0.9213648+0) #pben 0.0786352
+
+#3-component
+((mix3$lambda[2]*pnorm(0,mix3$mu[2],mix3$sigma[2]) + mix3$lambda[3]*pnorm(0,mix3$mu[3],mix3$sigma[3]))*94+3)/97 #pdel 0.9178688
+(mix3$lambda[1])*94/97 #pneut 0.06896601
+1-(0.9178688+0.06896601) #pben 0.01316519
+
+#4-component
+((mix4$lambda[2]*pnorm(0,mix4$mu[2],mix4$sigma[2]) + mix4$lambda[3]*pnorm(0,mix4$mu[3],mix4$sigma[3]) + mix4$lambda[4]*pnorm(0,mix4$mu[4],mix4$sigma[4]))*94+3)/97 #pdel 0.9183678
+(mix4$lambda[1])*94/97 #pneut 0.06573999
+1-(0.9183678+0.06573999) #pben 0.01589221
+
+#5-component
+((mix5$lambda[2]*pnorm(0,mix5$mu[2],mix5$sigma[2]) + mix5$lambda[3]*pnorm(0,mix5$mu[3],mix5$sigma[3]) + mix5$lambda[4]*pnorm(0,mix5$mu[4],mix5$sigma[4]) + mix5$lambda[5]*pnorm(0,mix5$mu[5],mix5$sigma[5]))*94+3)/97 #pdel 0.9505759
+(mix5$lambda[1])*94/97 #pneut 0
+1-(0.9505759+0) #pben 0.0494241
+
+#define the posterior probability of being neutral or nonneutral -- comes from the relative pdf of wt versus non-wt mixture components at the observed s for each mutation --> if s_obs < 0, then p.nonneut is p.del; if s_obs > 0, then it's p.ben
 Sc.data$PP.neut <- NA
+Sc.data$PP.nonneut <- NA
 Sc.data$PP.ben <- NA
 Sc.data$PP.del <- NA
-Sc.data[Sc.data$mean.s < -0.04,"PP.neut"] <- 0
+Sc.data[Sc.data$mean.s < -0.04 & Sc.data$bulk==T,"PP.neut"] <- 0
 Sc.data[Sc.data$mean.s > -0.04 & Sc.data$bulk==T,"PP.neut"] <- mix3$posterior[,1]
-#no inferred beneficial component in the mixture model, so PP.ben is 0 and PP.del = 1-PP.neut for all variants
-Sc.data$PP.del <- 1-Sc.data$PP.neut
-Sc.data[Sc.data$bulk==T,"PP.ben"] <- 0
-
-sum(Sc.data$PP.del,na.rm=T)/sum(!is.na(Sc.data$PP.del)) # 0.9310345
+Sc.data$PP.nonneut <- 1-Sc.data$PP.neut
+Sc.data[Sc.data$mean.s < 0 & Sc.data$bulk==T,"PP.del"] <- Sc.data[Sc.data$mean.s < 0 & Sc.data$bulk==T,"PP.nonneut"]
+Sc.data[Sc.data$mean.s < 0 & Sc.data$bulk==T,"PP.ben"] <- 0
+Sc.data[Sc.data$mean.s > 0 & Sc.data$bulk==T,"PP.ben"] <- Sc.data[Sc.data$mean.s > 0 & Sc.data$bulk==T,"PP.nonneut"]
+Sc.data[Sc.data$mean.s > 0 & Sc.data$bulk==T,"PP.del"] <- 0
+sum(Sc.data$PP.del,na.rm=T)/sum(!is.na(Sc.data$PP.neut)) # 0.915662
 sum(Sc.data$PP.neut,na.rm=T)/sum(!is.na(Sc.data$PP.neut)) # 0.06896547
-sum(Sc.data$PP.ben,na.rm=T)/sum(!is.na(Sc.data$PP.ben)) # 0
+sum(Sc.data$PP.ben,na.rm=T)/sum(!is.na(Sc.data$PP.neut)) # 0.01537257
 
 #plot of distribution of selection coefficients of reversions with an indication of the expected fraction in each bin that are neutral
 pdf(file="plots/Sc-rev_mean-s-histogram_bulk_indicate-neutral-bg.pdf",width=5.5,height=5,useDingbats=F)
 hist(Sc.data$mean.s[Sc.data$bulk==TRUE],breaks=seq(-0.6,0.01,0.01),col="gray50",xlab="selection coefficient of reverse mutation",main="",xlim=c(-0.6,0.05),ylim=c(0,55));abline(v=0,lty=2)
 breaks <- seq(-0.6,0.01,0.01)
 heights <- vector(length=length(breaks),mode="numeric") 
+heights.ben <- vector(length=length(breaks),mode="numeric") 
 for(i in 2:length(breaks)){
   heights[i] <- sum(Sc.data[Sc.data$bulk==TRUE & Sc.data$mean.s >= breaks[i-1] & Sc.data$mean.s < breaks[i],"PP.neut"])
+  heights.ben[i] <- sum(Sc.data[Sc.data$bulk==TRUE & Sc.data$mean.s >= breaks[i-1] & Sc.data$mean.s < breaks[i],"PP.ben"])
 }
 heights[heights==0] <- NA
-points(breaks-0.005, heights, pch=19,col="white",cex=0.5) #this gives proportional stack for histogram representation, have to modify in illustrator to make stacked histogram breaks at points
+heights.ben[heights.ben==0] <- NA
+heights.ben <- heights+heights.ben
+points(breaks-0.004, heights, pch=19,col="white",cex=0.5) #this gives proportional stack for histogram representation, have to modify in illustrator to make stacked histogram breaks at points
+points(breaks-0.006, heights.ben, pch=19,col="cyan",cex=0.5)
 dev.off()
 
 #zoom in on ~nearly neutral region
@@ -551,36 +567,43 @@ pdf(file="plots/Sc-rev_mean-s-histogram_bulk_nearly-neutral_indicate-neutral-bg.
 hist(Sc.data$mean.s[Sc.data$bulk==TRUE & Sc.data$mean.s > -0.1],breaks=seq(-0.05,0.01,0.0025),col="gray50",xlab="selection coefficient of reverse mutation",main="",xlim=c(-0.05,0.01),ylim=c(0,25),right=T);abline(v=0,lty=2)
 breaks <- seq(-0.05, 0.01, 0.0025)
 heights <- vector(length=length(breaks),mode="numeric") 
+heights.ben <- vector(length=length(breaks),mode="numeric") 
 for(i in 2:length(breaks)){
   heights[i] <- sum(Sc.data[Sc.data$bulk==TRUE & Sc.data$mean.s >= breaks[i-1] & Sc.data$mean.s < breaks[i],"PP.neut"])
+  heights.ben[i] <- sum(Sc.data[Sc.data$bulk==TRUE & Sc.data$mean.s >= breaks[i-1] & Sc.data$mean.s < breaks[i],"PP.ben"])
 }
 heights[heights==0] <- NA
-points(breaks-0.00125, heights, pch=19,col="white",cex=0.5) #modify in Illustrator to make stacked histogram bars
+heights.ben[heights.ben==0] <- NA
+heights.ben <- heights+heights.ben
+points(breaks-0.0012, heights, pch=19,col="white",cex=0.5) #modify in Illustrator to make stacked histogram bars
+points(breaks-0.00123, heights.ben, pch=19,col="cyan",cex=0.5) #modify in Illustrator to make stacked histogram bars
 dev.off()
 
-# #bootstrap estimate of the proportion deleterious, neutral, beneficial
-# B <- 10000 #number bootstrap replicates
-# p.del.boot <- vector(mode="numeric",length=B) #vectors to store proportions in each category in each bootstrap
-# p.ben.boot <- vector(mode="numeric",length=B)
-# p.neut.boot <- vector(mode="numeric",length=B)
-# set.seed(1990)
-# for(i in 1:B){
-#   #sample mean.s values with replacement
-#   boot <- sample(Sc.data[Sc.data$bulk==T,"mean.s"], size=length(Sc.data[Sc.data$bulk==T,"mean.s"]),replace=T)
-#   #for inferring mixture model, take out outliers
-#   boot.bulk <- boot[boot>-0.04]
-#   mix.boot <- normalmixEM(boot.bulk, k=3, lambda=rep(1/3, 3), mu=c(mean(Sc.WT$s),-0.01,-0.005), sigma=rep(sd(Sc.WT$s),3), mean.constr=c(mean(Sc.WT$s), rep(NA,2)), sd.constr=c(sd(Sc.WT$s),rep(NA,2)), arbmean=T, arbvar=T)
-#   p.del <- sum(mix.boot$posterior[,mix.boot$mu < mean(Sc.WT$s)])/sum(mix.boot$posterior) #proportion of main distribution mutations that are deleterious
-#   p.ben <- sum(mix.boot$posterior[,mix.boot$mu > -mean(Sc.WT$s)])/sum(mix.boot$posterior) #proportion of main distribution mutations that are beneficial
-#   p.neut <- sum(mix.boot$posterior[,mix.boot$mu >= mean(Sc.WT$s) & mix.boot$mu <= -mean(Sc.WT$s)])/sum(mix.boot$posterior) #proportion of main distribution mutations that are neutral
-#   #adjust proportion deleterious for the unambiguously deleterious "outliers" that were not fit in the mixture model
-#   p.del.boot[i] <- (p.del*length(boot.bulk) + length(boot)-length(boot.bulk))/length(boot)
-#   p.ben.boot[i] <- p.ben*length(boot.bulk)/length(boot)
-#   p.neut.boot[i] <- p.neut*length(boot.bulk)/length(boot)
-# }
-# hist(p.del.boot,breaks=40)
-# abline(v=0.9310345)
-# quantile(p.del.boot,c(0.025,0.975)) #0.830, 1.000
+#bootstrap estimate of the proportion deleterious, neutral, beneficial
+B <- 10000 #number bootstrap replicates
+p.del.boot <- vector(mode="numeric",length=B) #vectors to store proportions in each category in each bootstrap
+p.ben.boot <- vector(mode="numeric",length=B)
+p.neut.boot <- vector(mode="numeric",length=B)
+set.seed(1990)
+for(i in 1:B){
+  #sample mean.s values with replacement
+  boot <- sample(Sc.data[Sc.data$bulk==T,"mean.s"], size=length(Sc.data[Sc.data$bulk==T,"mean.s"]),replace=T)
+  #for inferring mixture model, take out outliers
+  boot.bulk <- boot[boot>-0.04]
+  mix.boot <- normalmixEM(boot.bulk, k=3, lambda=rep(1/3, 3), mu=c(mean(Sc.WT$s),-0.01,-0.005), sigma=rep(sd(Sc.WT$s),3), mean.constr=c(mean(Sc.WT$s), rep(NA,2)), sd.constr=c(sd(Sc.WT$s),rep(NA,2)), arbmean=T, arbvar=T)
+  p.del <- mix.boot$lambda[2]*pnorm(0,mix.boot$mu[2],mix.boot$sigma[2]) + mix.boot$lambda[3]*pnorm(0,mix.boot$mu[3],mix.boot$sigma[3]) #proportion deleterious
+  p.neut <- mix.boot$lambda[1] #proportion neutral
+  p.ben <- 1-(p.del+p.neut) #proportion beneficial
+  #adjust proportions for the unambiguously deleterious "outliers" that were not fit in the mixture model
+  p.del.boot[i] <- (p.del*length(boot.bulk) + length(boot)-length(boot.bulk))/length(boot)
+  p.ben.boot[i] <- p.ben*length(boot.bulk)/length(boot)
+  p.neut.boot[i] <- p.neut*length(boot.bulk)/length(boot)
+}
+hist(p.del.boot,breaks=40)
+abline(v=0.9178688)
+quantile(p.del.boot,c(0.025,0.975)) #0.8255892, 0.9860524
+quantile(p.neut.boot,c(0.025,0.975)) #7.378482e-26, 1.701570e-01
+quantile(p.ben.boot,c(0.025,0.975)) #0.000510731, 0.061215766
 
 #ancAmo data
 vals <- ancAmo.data$mean.s[ancAmo.data$bulk==TRUE & ancAmo.data$mean.s > -0.04]
@@ -601,11 +624,37 @@ n <- 4; mix4 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), mu=c(mean(ancAmo.WT$s
 n <- 5; mix5 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), maxit=2000, mu=c(mean(ancAmo.WT$s),-0.02,-0.001,0.001,0.02), sigma=rep(sd(ancAmo.WT$s),n), mean.constr=c(mean(ancAmo.WT$s), rep(NA,n-1)), sd.constr=c(sd(ancAmo.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
 n <- 6; mix6 <- normalmixEM(vals, k=n, lambda=rep(1/n, n), maxit=2000, mu=c(mean(ancAmo.WT$s),-0.02,-0.001,-0.001,0.001,0.02), sigma=rep(sd(ancAmo.WT$s),n), mean.constr=c(mean(ancAmo.WT$s), rep(NA,n-1)), sd.constr=c(sd(ancAmo.WT$s),rep(NA,n-1)), arbmean=T, arbvar=T)
 
-summary.mixEM(mix2) #loglik 243.8518 , k = 3, AIC = -481.7036, sum(lambda.del) = 0.766, sum(lambda.ben) = 0.000
-summary.mixEM(mix3) #loglik 245.4855 , k = 6, AIC = -478.971, sum(lambda.del) = 0.910, sum(lambda.ben) = 0.000
-summary.mixEM(mix4) #loglik 246.215, k = 9, AIC = -474.43, sum(lambda.del) = 0.376, sum(lambda.ben) = 0.133
-summary.mixEM(mix5) #loglik 252.74, k = 12, AIC = -481.48, sum(lambda.del) = 0.493, sum(lambda.ben) = 0.162
-summary.mixEM(mix6) #loglik 252.74 , k = 15, AIC = -475.48, sum(lambda.del) = 0.493, sum(lambda.ben) = 0.162
+summary.mixEM(mix2) #loglik 243.8518 , k = 3, AIC = -481.7036, fraction neutral: 0.234324130
+summary.mixEM(mix3) #loglik 245.4855 , k = 6, AIC = -478.971, fraction neutral: 0.089577074
+summary.mixEM(mix4) #loglik 246.215, k = 9, AIC = -474.43, fraction neutral: 0.490059361
+summary.mixEM(mix5) #loglik 252.74, k = 12, AIC = -481.48, fraction neutral: 0.344545737
+summary.mixEM(mix6) #loglik 252.74 , k = 15, AIC = -475.48, fraction neutral: 0.344544149
+
+#estimate fraction deleterious, beneficial, neutral for each mixture model: fraction neut is neutral component mixture weight; fraction del is remaining non-neutral component density that is less than zero; fraction ben is remaining non-neutral component density that is greater than zero; reweight the fractions to include the unambiguously deleterious mutatns with s < -0.04 that were excluded from model inference (6 mutants, added on top of the 81 mutants in mixture model)
+#2-component
+((mix2$lambda[2]*pnorm(0,mix2$mu[2],mix2$sigma[2]))*81+6)/87 #pdel 0.531855
+(mix2$lambda[1]*81)/87 #pneut 0.2181638
+1-(0.531855+0.2181638) #pben 0.2499812
+
+#3-component
+((mix3$lambda[2]*pnorm(0,mix3$mu[2],mix3$sigma[2]) + mix3$lambda[3]*pnorm(0,mix3$mu[3],mix3$sigma[3]))*81+6)/87 #pdel 0.5867307
+(mix3$lambda[1])*81/87 #pneut 0.08339934
+1-(0.5867307+0.08339934) #pben 0.32987
+
+#4-component
+((mix4$lambda[2]*pnorm(0,mix4$mu[2],mix4$sigma[2]) + mix4$lambda[3]*pnorm(0,mix4$mu[3],mix4$sigma[3]) + mix4$lambda[4]*pnorm(0,mix4$mu[4],mix4$sigma[4]))*81+6)/87 #pdel 0.4121239
+(mix4$lambda[1])*81/87 #pneut 0.4562622
+1-(0.4121239+0.4562622) #pben 0.1316139
+
+#5-component
+((mix5$lambda[2]*pnorm(0,mix5$mu[2],mix5$sigma[2]) + mix5$lambda[3]*pnorm(0,mix5$mu[3],mix5$sigma[3]) + mix5$lambda[4]*pnorm(0,mix5$mu[4],mix5$sigma[4]) + mix5$lambda[5]*pnorm(0,mix5$mu[5],mix5$sigma[5]))*81+6)/87 #pdel 0.4817857
+(mix5$lambda[1])*81/87 #pneut 0.320784
+1-(0.4817857+0.320784) #pben 0.1974303
+
+#6-component
+((mix6$lambda[2]*pnorm(0,mix6$mu[2],mix6$sigma[2]) + mix6$lambda[3]*pnorm(0,mix6$mu[3],mix6$sigma[3]) + mix6$lambda[4]*pnorm(0,mix6$mu[4],mix6$sigma[4]) + mix6$lambda[5]*pnorm(0,mix6$mu[5],mix6$sigma[5]) + mix6$lambda[6]*pnorm(0,mix6$mu[6],mix6$sigma[6]))*81+6)/87 #pdel 0.4817864
+(mix6$lambda[1])*81/87 #pneut 0.3207825
+1-(0.4817864+0.3207825) #pben 0.1974311
 
 #2-component and 5-component similarly favored by AIC -- tentatively would favor 5-component, it's more conservative (for # deleterious) and just "looks" like a better fit...
 #define density functions for these 2- and 5-component mixture model
@@ -626,18 +675,19 @@ abline(a=0,b=1)
 
 #define the posterior probability of being deleterious, neutral, beneficial for each mutation -- comes from the relative pdf of deleterious versus wt versus beneficial components at the given s for each mutation
 ancAmo.data$PP.neut <- NA
+ancAmo.data$PP.nonneut <- NA
 ancAmo.data$PP.ben <- NA
 ancAmo.data$PP.del <- NA
-ancAmo.data[ancAmo.data$mean.s < -0.04 & ancAmo.data$bulk == T,"PP.neut"] <- 0
-ancAmo.data[ancAmo.data$mean.s < -0.04 & ancAmo.data$bulk == T,"PP.ben"] <- 0
-ancAmo.data[ancAmo.data$mean.s < -0.04 & ancAmo.data$bulk == T,"PP.del"] <- 1
-ancAmo.data[ancAmo.data$mean.s > -0.04 & ancAmo.data$bulk == T,"PP.neut"] <- mix5$posterior[,1]
-ancAmo.data[ancAmo.data$mean.s > -0.04 & ancAmo.data$bulk == T,"PP.ben"] <- mix5$posterior[,4]+mix5$posterior[,5]
-ancAmo.data[ancAmo.data$mean.s > -0.04 & ancAmo.data$bulk == T,"PP.del"] <- mix5$posterior[,2]+mix5$posterior[,3]
-
-sum(ancAmo.data$PP.del,na.rm=T)/sum(!is.na(ancAmo.data$PP.del)) # 0.5280663
-sum(ancAmo.data$PP.ben,na.rm=T)/sum(!is.na(ancAmo.data$PP.ben)) # 0.151148
+ancAmo.data[ancAmo.data$mean.s < -0.04 & ancAmo.data$bulk==T,"PP.neut"] <- 0
+ancAmo.data[ancAmo.data$mean.s > -0.04 & ancAmo.data$bulk==T,"PP.neut"] <- mix5$posterior[,1]
+ancAmo.data$PP.nonneut <- 1-ancAmo.data$PP.neut
+ancAmo.data[ancAmo.data$mean.s < 0 & ancAmo.data$bulk==T,"PP.del"] <- ancAmo.data[ancAmo.data$mean.s < 0 & ancAmo.data$bulk==T,"PP.nonneut"]
+ancAmo.data[ancAmo.data$mean.s < 0 & ancAmo.data$bulk==T,"PP.ben"] <- 0
+ancAmo.data[ancAmo.data$mean.s > 0 & ancAmo.data$bulk==T,"PP.ben"] <- ancAmo.data[ancAmo.data$mean.s > 0 & ancAmo.data$bulk==T,"PP.nonneut"]
+ancAmo.data[ancAmo.data$mean.s > 0 & ancAmo.data$bulk==T,"PP.del"] <- 0
+sum(ancAmo.data$PP.del,na.rm=T)/sum(!is.na(ancAmo.data$PP.neut)) # 0.4842982
 sum(ancAmo.data$PP.neut,na.rm=T)/sum(!is.na(ancAmo.data$PP.neut)) # 0.3207857
+sum(ancAmo.data$PP.ben,na.rm=T)/sum(!is.na(ancAmo.data$PP.neut)) # 0.1949161
 
 #plot of distribution of selection coefficients of reversions with an indication of the expected fraction in each bin that are neutral, beneficial
 pdf(file="plots/ancAmo-rev_mean-s-histogram_bulk_indicate-neutral-bg.pdf",width=5.5,height=5,useDingbats=F)
@@ -673,38 +723,43 @@ points(breaks-0.003, heights.neut, pch=19,col="white",cex=0.5)
 points(breaks-0.002, heights.ben, pch=19,col="cyan",cex=0.5) #modify in Illustrator to make stacked colors in histogram bins
 dev.off()
 
-# #bootstrap estimate of the proportion deleterious, neutral, beneficial
-# B <- 10000
-# p.del.boot <- vector(mode="numeric",length=B)
-# p.ben.boot <- vector(mode="numeric",length=B)
-# p.neut.boot <- vector(mode="numeric",length=B)
-# set.seed(10990)
-# for(i in 1:B){
-#   #sample mean.s values with replacement
-#   boot <- sample(ancAmo.data[ancAmo.data$bulk==T,"mean.s"], size=length(ancAmo.data[ancAmo.data$bulk==T,"mean.s"]),replace=T)
-#   #for inferring mixture model, take out outliers
-#   boot.bulk <- boot[boot>-0.04]
-#   mix.boot <- normalmixEM(boot.bulk, k=5, lambda=rep(1/5, 5), maxit=2000, mu=c(mean(ancAmo.WT$s),-0.02,-0.001,0.001,0.02), sigma=rep(sd(ancAmo.WT$s),5), mean.constr=c(mean(ancAmo.WT$s), rep(NA,4)), sd.constr=c(sd(ancAmo.WT$s),rep(NA,4)), arbmean=T, arbvar=T)
-#   p.del <- sum(mix.boot$posterior[,mix.boot$mu < mean(ancAmo.WT$s)])/sum(mix.boot$posterior) #proportion of main distribution mutations that are deleterious
-#   p.ben <- sum(mix.boot$posterior[,mix.boot$mu > -mean(ancAmo.WT$s)])/sum(mix.boot$posterior) #proportion of main distribution mutations that are beneficial
-#   p.neut <- sum(mix.boot$posterior[,mix.boot$mu >= mean(ancAmo.WT$s) & mix.boot$mu <= -mean(ancAmo.WT$s)])/sum(mix.boot$posterior) #proportion of main distribution mutations that are neutral
-#   #adjust proportion deleterious for the unambiguously deleterious "outliers" that were not fit in the mixture model
-#   p.del.boot[i] <- (p.del*length(boot.bulk) + length(boot)-length(boot.bulk))/length(boot)
-#   p.ben.boot[i] <- p.ben*length(boot.bulk)/length(boot)
-#   p.neut.boot[i] <- p.neut*length(boot.bulk)/length(boot)
-# }
-# hist(p.del.boot)
-# abline(v=0.5280663)
-# quantile(p.del.boot,c(0.025,0.975)) #0.274, 0.955
-# 
-# hist(p.ben.boot)
-# abline(v=0.151148)
-# quantile(p.ben.boot,c(0.025,0.975)) #0.034, 0.573
-# 
-# hist(p.neut.boot)
-# abline(v=0.151148)
-# quantile(p.neut.boot,c(0.025,0.975)) #0.000, 0.593
+#bootstrap estimate of the proportion deleterious, neutral, beneficial
+B <- 10000
+p.del.boot <- vector(mode="numeric",length=B)
+p.ben.boot <- vector(mode="numeric",length=B)
+p.neut.boot <- vector(mode="numeric",length=B)
+set.seed(10990)
+for(i in 1:B){
+  #sample mean.s values with replacement
+  boot <- sample(ancAmo.data[ancAmo.data$bulk==T,"mean.s"], size=length(ancAmo.data[ancAmo.data$bulk==T,"mean.s"]),replace=T)
+  #for inferring mixture model, take out outliers
+  boot.bulk <- boot[boot>-0.04]
+  #5-component
+  mix.boot <- normalmixEM(boot.bulk, k=5, lambda=rep(1/5, 5), maxit=4000, mu=c(mean(ancAmo.WT$s),-0.02,-0.001,0.001,0.02), sigma=rep(sd(ancAmo.WT$s),5), mean.constr=c(mean(ancAmo.WT$s), rep(NA,4)), sd.constr=c(sd(ancAmo.WT$s),rep(NA,4)), arbmean=T, arbvar=T)
+  p.del <- mix.boot$lambda[2]*pnorm(0,mix.boot$mu[2],mix.boot$sigma[2]) + mix.boot$lambda[3]*pnorm(0,mix.boot$mu[3],mix.boot$sigma[3]) + mix.boot$lambda[4]*pnorm(0,mix.boot$mu[4],mix.boot$sigma[4]) + mix.boot$lambda[5]*pnorm(0,mix.boot$mu[5],mix.boot$sigma[5]) #proportion deleterious
+  p.neut <- mix.boot$lambda[1] #proportion neutral
+  p.ben <- 1-(p.del+p.neut) #proportion beneficial
+  # #2-component
+  # mix.boot <- normalmixEM(boot.bulk, k=2, lambda=rep(1/2, 2), maxit=2000, mu=c(mean(ancAmo.WT$s),-0.02), sigma=rep(sd(ancAmo.WT$s),2), mean.constr=c(mean(ancAmo.WT$s), NA), sd.constr=c(sd(ancAmo.WT$s),NA), arbmean=T, arbvar=T)
+  # p.del <- mix.boot$lambda[2]*pnorm(0,mix.boot$mu[2],mix.boot$sigma[2]) #proportion deleterious
+  # p.neut <- mix.boot$lambda[1] #proportion neutral
+  # p.ben <- 1-(p.del+p.neut) #proportion beneficial
+  #adjust proportions for the unambiguously deleterious "outliers" that were not fit in the mixture model
+  p.del.boot[i] <- (p.del*length(boot.bulk) + length(boot)-length(boot.bulk))/length(boot)
+  p.ben.boot[i] <- p.ben*length(boot.bulk)/length(boot)
+  p.neut.boot[i] <- p.neut*length(boot.bulk)/length(boot)
+}
+hist(p.del.boot,na.rm=T)
+abline(v=0.4817857)
+quantile(p.del.boot,c(0.025,0.975)) #5comp: 0.2899124, 0.7362807 (2-comp: 0.2188016, 0.6753665)
 
+hist(p.ben.boot)
+abline(v=0.1974303)
+quantile(p.ben.boot,c(0.025,0.975)) #5comp: 0.08671901, 0.42151434 (2-comp: 1.191354e-06, 3.619361e-01)
+
+hist(p.neut.boot)
+abline(v=0.320784)
+quantile(p.neut.boot,c(0.025,0.975)) #5comp: 3.743119e-08, 5.740308e-01 (2-comp: 3.028756e-07, 7.810873e-01)
 
 ################################################################################################################################
 #one metric of extent of epistasis is to compare the expected fitness of a genotypes with multiple mutations to the expected fitness if mutations were additive
@@ -886,16 +941,6 @@ ancAmo.data$direction <- as.factor(ancAmo.data$direction)
 #take out isolated measurements in ancAmo background which have no estimates of error
 ancAmo.data.bulk <- ancAmo.data[ancAmo.data$bulk==TRUE,]
 
-#fraction of all subs that are neither contingent NOR irreversible?
-#need to do separately for each class
-#first, class 0 (i->j->i); PP.del is prob contingent, Sc.PP.del is prob entrenched
-x <- sum(ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"PP.ben"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"Sc.PP.ben"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"Sc.PP.ben"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==0,"PP.ben"],na.rm=T)
-#next, class 1 (i->j); PP.del is prob contingent, Sc.PP.ben is prob entrenched
-x <- x + sum(ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"PP.ben"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"Sc.PP.del"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"Sc.PP.del"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==1,"PP.ben"],na.rm=T)
-#finally, class 2 (i->j->k); PP.del is prob that k is contingent, Sc.PP.del is prob k is irreversible (remember this Sc.PP.del is not for the substituion in that row, but rather for that intermediate state j, coming from different starting points in ancAmo versus Sc)
-x <- x + sum(ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"Sc.PP.neut"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"PP.ben"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"Sc.PP.ben"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"PP.neut"] + ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"Sc.PP.ben"]*ancAmo.data.bulk[ancAmo.data.bulk$direction==2,"PP.ben"],na.rm=T)
-x/(nrow(ancAmo.data.bulk)-1) #5.01%
-
 #for each mutation, compute joint PP of various combinations of being contingent and irreversible
 for(i in 1:nrow(ancAmo.data.bulk)){
   if(ancAmo.data.bulk$direction[i]==0){ #first, class 0 (i->j->i); PP.del is prob contingent, Sc.PP.del is prob entrenched
@@ -930,32 +975,24 @@ for(i in 1:nrow(ancAmo.data.bulk)){
     ancAmo.data.bulk$PP.ben.ben[i] <- ancAmo.data.bulk[i,"PP.ben"]*ancAmo.data.bulk[i,"Sc.PP.ben"] #PP that derived state preferred in ancAmo, ancestral state preferred in Sc
   }
 }
-sum(ancAmo.data.bulk$PP.del.ben,ancAmo.data.bulk$PP.del.neut,ancAmo.data.bulk$PP.del.del,ancAmo.data.bulk$PP.neut.ben,ancAmo.data.bulk$PP.neut.neut,ancAmo.data.bulk$PP.neut.del,ancAmo.data.bulk$PP.ben.ben,ancAmo.data.bulk$PP.ben.neut,ancAmo.data.bulk$PP.ben.del,na.rm=T)
-sum(ancAmo.data.bulk$PP.del.del,na.rm=T)/86 # 0.502 proportion ancestral state preferred in ancAmo, derived state preferred in Sc (contingent and entrenched)
-sum(ancAmo.data.bulk$PP.del.neut,na.rm=T)/86 # 0.025 proportion ancestral state preferred in ancAmo, neither state preferred in Sc (contingent)
-sum(ancAmo.data.bulk$PP.del.ben,na.rm=T)/86 # 0 proportion ancestral state preferred in both ancAmo and Sc
-sum(ancAmo.data.bulk$PP.neut.del,na.rm=T)/86 # 0.301 proportion neither state preferred in ancAmo, derived state preferred in Sc (irreversible, entrenched)
-sum(ancAmo.data.bulk$PP.neut.neut,na.rm=T)/86 # 0.019 proportion neither state preferred in both ancAmo and Sc
-sum(ancAmo.data.bulk$PP.neut.ben,na.rm=T)/86 # 0 proportion neither state preferred in ancAmo, ancestral state preferred in Sc
-sum(ancAmo.data.bulk$PP.ben.del,na.rm=T)/86 # 0.122 proportion derived state preferred in both ancAmo and Sc (irreversible, though not entrenched)
-sum(ancAmo.data.bulk$PP.ben.neut,na.rm=T)/86 # 0.031 proportion derived state preferred in ancAmo, neither state preferred in Sc
-sum(ancAmo.data.bulk$PP.ben.ben,na.rm=T)/86 # 0 proportion derived state preferred in ancAmo, ancestral state preferred in Sc
 
-sum(ancAmo.data.bulk$PP.del.ben+ancAmo.data.bulk$PP.neut.neut+ancAmo.data.bulk$PP.ben.del,na.rm=T)/86 #fraction nonepistatic: 0.141 (though some of these labeled "nonepistatic" can still be contingent or irreversible)
-1-sum(ancAmo.data.bulk$PP.del.ben+ancAmo.data.bulk$PP.neut.neut+ancAmo.data.bulk$PP.ben.del,na.rm=T)/86 #fraction epistatic: 0.859
+sum(ancAmo.data.bulk$PP.del.ben+ancAmo.data.bulk$PP.neut.neut+ancAmo.data.bulk$PP.ben.del,na.rm=T)/86 #fraction nonepistatic: 0.181 (though some of these labeled "nonepistatic" can still be contingent or irreversible)
+1-sum(ancAmo.data.bulk$PP.del.ben+ancAmo.data.bulk$PP.neut.neut+ancAmo.data.bulk$PP.ben.del,na.rm=T)/86 #fraction epistatic: 0.819
 
 
 pdf(file="plots/joint-probabilities_del-neut-ben_all.pdf",width=5,height=5,useDingbats=F)
-barplot(rev(c(sum(ancAmo.data.bulk$PP.del.del,na.rm=T)/86, # 0.502 proportion ancestral state preferred in ancAmo, derived state preferred in Sc (contingent and irreversible)
-          sum(ancAmo.data.bulk$PP.del.neut,na.rm=T)/86, # 0.025 proportion ancestral state preferred in ancAmo, neither state preferred in Sc (contingent)
-          sum(ancAmo.data.bulk$PP.del.ben,na.rm=T)/86, # 0 proportion ancestral state preferred in both ancAmo and Sc (contingent)
-          sum(ancAmo.data.bulk$PP.neut.del,na.rm=T)/86, # 0.301 proportion neither state preferred in ancAmo, derived state preferred in Sc (irreversible)
-          sum(ancAmo.data.bulk$PP.neut.neut,na.rm=T)/86, # 0.019 proportion neither state preferred in both ancAmo and Sc
-          sum(ancAmo.data.bulk$PP.neut.ben,na.rm=T)/86, # 0 proportion neither state preferred in ancAmo, ancestral state preferred in Sc
-          sum(ancAmo.data.bulk$PP.ben.del,na.rm=T)/86, # 0.122 proportion derived state preferred in both ancAmo and Sc (irreversible)
-          sum(ancAmo.data.bulk$PP.ben.neut,na.rm=T)/86, # 0.031 proportion derived state preferred in ancAmo, neither state preferred in Sc
-          sum(ancAmo.data.bulk$PP.ben.ben,na.rm=T)/86)),xlab="proportion substitutions",horiz=T) # 0 proportion derived state preferred in ancAmo, ancestral state preferred in Sc
+barplot(rev(c(sum(ancAmo.data.bulk$PP.del.neut,na.rm=T)/86, # 0.0225 proportion ancestral state preferred in ancAmo, neither state preferred in Sc (contingent)
+              sum(ancAmo.data.bulk$PP.neut.del,na.rm=T)/86, # 0.2971 proportion neither state preferred in ancAmo, derived state preferred in Sc (entrencehd)
+              sum(ancAmo.data.bulk$PP.del.del,na.rm=T)/86, # 0.4543 proportion ancestral state preferred in ancAmo, derived state preferred in Sc (contingent and entrenched)
+              sum(ancAmo.data.bulk$PP.neut.ben,na.rm=T)/86, # 0.0038 proportion neither state preferred in ancAmo, ancestral state preferred in Sc
+              sum(ancAmo.data.bulk$PP.ben.neut,na.rm=T)/86, # 0.0334 proportion derived state preferred in ancAmo, neither state preferred in Sc
+              sum(ancAmo.data.bulk$PP.ben.ben,na.rm=T)/86, # 0.0077 proportion derived state preferred in ancAmo, ancestral state preferred in Sc
+              sum(ancAmo.data.bulk$PP.neut.neut,na.rm=T)/86, # 0.0193 proportion neither state preferred in both ancAmo and Sc
+              sum(ancAmo.data.bulk$PP.del.ben,na.rm=T)/86, # 0.0058 proportion ancestral state preferred in both ancAmo and Sc
+              sum(ancAmo.data.bulk$PP.ben.del,na.rm=T)/86)),xlab="proportion substitutions",horiz=T) # 0.1561 proportion derived state preferred in both ancAmo and Sc
 dev.off()
+
+0.0225+0.2971+0.4543 #0.7739 contingent, entrenched, or both
 
 #correlation in mutational effects between backgrounds, for i->j substitutions
 cor.test(ancAmo.data.bulk[ancAmo.data.bulk$mean.s > -0.1 & ancAmo.data.bulk$mean.s < 0.1 & ancAmo.data.bulk$mean.s.rev > -0.1 & ancAmo.data.bulk$mean.s.rev < 0.1 & ancAmo.data.bulk$direction==1,"mean.s.rev"], ancAmo.data.bulk[ancAmo.data.bulk$mean.s > -0.1 & ancAmo.data.bulk$mean.s < 0.1 & ancAmo.data.bulk$mean.s.rev > -0.1 & ancAmo.data.bulk$mean.s.rev < 0.1 & ancAmo.data.bulk$direction==1,"mean.s"])
